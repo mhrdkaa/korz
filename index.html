@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<style>
+  #errors{
+    border-radius: 5px;
+    border: 2px solid #2ef;
+  }
+</style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-inline' 'self' ">
+<script>
+    navigator.serviceWorker.register('sw.js');
+  </script>
+</head>
+<body>
+<input type="url" id="url" value="https://httpbin.org/get">
+<button>Exec</button><br>
+<pre id="errors"></pre>
+  <script>
+    //const url = 'https://httpbin.org/get';
+    document.querySelector('button').addEventListener('click', e => {
+      /* using fetch */
+      const url = document.querySelector('#url').value;
+      fetch('/int?url='+url, {credentials: 'include', mode: 'no-cors'})
+      .then(r=>r.text()).then(d=>document.querySelector('#errors').textContent=d);
+    });
+  </script>
+</body>
