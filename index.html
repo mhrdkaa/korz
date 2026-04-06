@@ -19,12 +19,29 @@
 <button>Exec</button><br>
 <pre id="errors"></pre>
   <script>
-    //const url = 'https://httpbin.org/get';
-    document.querySelector('button').addEventListener('click', e => {
-      /* using fetch */
-      const url = document.querySelector('#url').value;
-      fetch('/korz/int?url='+url, {credentials: 'include', mode: 'no-cors'})
-      .then(r=>r.text()).then(d=>document.querySelector('#errors').textContent=d);
-    });
-  </script>
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    console.log('SW Registered!');
+  });
+
+  document.querySelector('button').addEventListener('click', e => {
+    if (!navigator.serviceWorker.controller) {
+      alert('Service Worker belum aktif, coba refresh sekali lagi!');
+      return;
+    }
+
+    const url = document.querySelector('#url').value;
+    const errorBox = document.querySelector('#errors');
+    
+    errorBox.textContent = "Loading...";
+
+    fetch('int?url=' + encodeURIComponent(url))
+      .then(r => r.text())
+      .then(d => {
+        errorBox.textContent = d;
+      })
+      .catch(err => {
+        errorBox.textContent = "Error: " + err;
+      });
+  });
+</script>
 </body>
