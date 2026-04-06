@@ -23,7 +23,7 @@
     document.querySelector('button').addEventListener('click', e => {
       /* using fetch */
       const url = document.querySelector('#url').value;
-      fetch('?url='+url, {credentials: 'include', mode: 'no-cors'})
+      fetch('/int?url='+url, {credentials: 'include', mode: 'no-cors'})
       .then(r=>r.text()).then(d=>document.querySelector('#errors').textContent=d);
     });
   </script>
