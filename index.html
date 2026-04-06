@@ -1,47 +1,14 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
+
 <head>
-<title></title>
-<style>
-  #errors{
-    border-radius: 5px;
-    border: 2px solid #2ef;
-  }
-</style>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-inline' 'self' ">
-<script>
-    navigator.serviceWorker.register('sw.js');
-  </script>
+    <meta charset="UTF-8">
+    <title>konpoc</title>
 </head>
+
 <body>
-<input type="url" id="url" value="https://httpbin.org/get">
-<button>Exec</button><br>
-<pre id="errors"></pre>
-  <script>
-  navigator.serviceWorker.register('sw.js').then(reg => {
-    console.log('SW Registered!');
-  });
-
-  document.querySelector('button').addEventListener('click', e => {
-    if (!navigator.serviceWorker.controller) {
-      alert('Service Worker belum aktif, coba refresh sekali lagi!');
-      return;
-    }
-
-    const url = document.querySelector('#url').value;
-    const errorBox = document.querySelector('#errors');
-    
-    errorBox.textContent = "Loading...";
-
-    fetch('int?url=' + encodeURIComponent(url))
-      .then(r => r.text())
-      .then(d => {
-        errorBox.textContent = d;
-      })
-      .catch(err => {
-        errorBox.textContent = "Error: " + err;
-      });
-  });
-</script>
+        <iframe src="https://form349.vercel.app/githubreps" width="100%" height="200px" style="border: 2px dashed red;">
+        </iframe>
 </body>
+
+</html>
