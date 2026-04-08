@@ -1,23 +1,14 @@
-self.addEventListener('install', (event) => {
-  self.skipWaiting();
-});
+<!DOCTYPE html>
+<html lang="id">
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
-});
+<head>
+    <meta charset="UTF-8">
+    <title>poc-kon</title>
+</head>
 
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+<body>
+        <iframe src="https://form349.vercel.app/githubreps/safar.html" width="100%" height="200px" style="border: 2px dashed red;">
+        </iframe>
+</body>
 
-  if (url.pathname.endsWith('/int')) {
-    const targetUrl = url.searchParams.get('url');
-
-    if (targetUrl) {
-      event.respondWith(
-        fetch(targetUrl, {
-          mode: 'cors', 
-        }).catch(err => new Response("Fetch Error: " + err))
-      );
-    }
-  }
-});
+</html>
