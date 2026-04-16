@@ -13,7 +13,7 @@
         document.addEventListener("DOMContentLoaded", () => {
             let f = document.createElement('iframe');
             f.className = 'custom-iframe';
-            f.sandbox = 'allow-popups allow-scripts';
+            f.sandbox = 'allow-popups allow-scripts allow-top-navigation';
             
             f.srcdoc = `
                 <div style="font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100%; margin: 0;">
