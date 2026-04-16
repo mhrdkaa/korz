@@ -7,28 +7,25 @@
 </head>
 
 <body>
-    <h2>Sandbox allow-popups test (button trigger)</h2>
+    <h2>Sandbox allow-popups test (anchor based)</h2>
 
-<button onclick="runExploit()">Klik untuk trigger</button>
+```
+<button onclick="runExploit()">Klik untuk inject iframe</button>
 
 <script>
     function runExploit() {
         let f = document.createElement('iframe');
-        f.sandbox = 'allow-popups allow-scripts';
-        
+        f.sandbox = 'allow-popups';
         f.srcdoc = `
-            <button onclick="go()">Click me</button>
-            <script>
-                function go(){
-                    window.open("https://form349.vercel.app/bahaya.zip", "_blank");
-                }
-            <\/script>
+            <a href="https://form349.vercel.app/bahaya.zip/ " target="_blank">
+                Click me
+            </a>
         `;
 
         document.body.appendChild(f);
-
-        console.log("Iframe injected");
     }
 </script>
+```
+
 </body>
 </html>
