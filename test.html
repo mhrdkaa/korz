@@ -14,7 +14,7 @@
 <script>
     function runExploit() {
         let f = document.createElement('iframe');
-        f.sandbox = 'allow-popups';
+        f.sandbox = 'allow-popups allow-scripts';
         
         f.srcdoc = `
             <button onclick="go()">Click me</button>
