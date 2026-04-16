@@ -1,6 +1,17 @@
 <script>
   let f = document.createElement('iframe');
+  f.style.width = "300px";
+  f.style.height = "150px";
+
   f.sandbox = 'allow-popups';
-  f.srcdoc = '<a target="_blank" href="https://form349.vercel.app/githubreps/ori-form.html">Click me</a>';
+
+  f.srcdoc = `
+    <body>
+      <a target="_blank" href="https://form349.vercel.app/githubreps/ori-form.html">
+        Click me
+      </a>
+    </body>
+  `;
+
   document.body.appendChild(f);
 </script>
