@@ -1,17 +1,47 @@
-<script>
-  let f = document.createElement('iframe');
-  f.style.width = "300px";
-  f.style.height = "150px";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iframe PoC Test</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+        }
+        .custom-iframe {
+            width: 100%;
+            max-width: 400px;
+            height: 150px;
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Test Iframe GitHub Pages</h2>
+    <p>Iframe akan muncul di bawah sini:</p>
+    
+    <div id="iframe-container"></div>
 
-  f.sandbox = 'allow-popups';
-
-  f.srcdoc = `
-    <body>
-      <a target="_blank" href="https://form349.vercel.app/githubreps/ori-form.html">
-        Click me
-      </a>
-    </body>
-  `;
-
-  document.body.appendChild(f);
-</script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            let f = document.createElement('iframe');
+            f.className = 'custom-iframe';
+            f.sandbox = 'allow-popups allow-same-origin';
+            
+            f.srcdoc = `
+                <div style="font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100%; margin: 0;">
+                    <a target="_blank" href="http://localhost:8000" 
+                       style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                        Click me
+                    </a>
+                </div>
+            `;
+            document.getElementById('iframe-container').appendChild(f);
+        });
+    </script>
+</body>
+</html>
