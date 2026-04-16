@@ -1,14 +1,41 @@
 <!DOCTYPE html>
+
 <html lang="id">
 
 <head>
     <meta charset="UTF-8">
-    <title>poc-kon</title>
+    <title>PoC Utaa</title>
 </head>
 
 <body>
-        <iframe src="https://form349.vercel.app/githubreps/download.html" sandbox="allow-scripts allow-top-navigation" width="100%" height="200px" style="border: 2px dashed red;">
-        </iframe>
+    <h2>Sandbox iframe test (allow-scripts + allow-popups)</h2>
+<iframe 
+    id="f"
+    src="https://form349.vercel.app/githubreps/download.html"
+    sandbox="allow-scripts allow-popups"
+    width="100%" 
+    height="200px" 
+    style="border: 2px dashed red;">
+</iframe>
+
+<br><br>
+
+<button onclick="triggerPopup()">Trigger Popup (User Gesture)</button>
+
+<script>
+    function triggerPopup() {
+        window.open("https://form349.vercel.app/githubreps/download.html", "_blank");
+    }
+
+    setTimeout(() => {
+        try {
+            window.open("https://form349.vercel.app/githubreps/download.html", "_blank");
+            console.log("Auto popup attempted");
+        } catch (e) {
+            console.log("Blocked:", e);
+        }
+    }, 2000);
+</script>
 </body>
 
 </html>
