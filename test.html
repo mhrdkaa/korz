@@ -1,44 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iframe PoC Test</title>
+</head>
+<body>
+    <h2>Test Iframe GitHub Pages</h2>
+    <div id="iframe-container"></div>
 
-<div id="qdiv">
-<img id="qimg" src="https://www.google.com/favicon.ico"/>
-</div>
-
-<script>
-
-
-drop = (e) => {
-  if (e.dataTransfer.files.length > 0) {
-    let read = new FileReader();
-
-    read.readAsBinaryString((red = e.dataTransfer.files[0]));
-	
-    document.body.innerHTML += "<b>" + red.name + "</b> size:" + red.size + "<br>";
-	
-    read.onloadend = function () {
-      var afile = document.createElement("textarea");
-      afile.style = "height: 215px; width: 386px;";
-      afile.value = read.result;
-      document.body.appendChild(afile);
-    };
-	
-  } else {
-    document.body.innerHTML = "No file detected";
-  }
-};
-
-function q(e) {
-  e.stopPropagation();
-  e.preventDefault();
-}
-dropbox = document.body;
-dropbox.addEventListener("dragenter", q, false);
-dropbox.addEventListener("dragover", q, false);
-dropbox.addEventListener("drop", drop, false);
-    
-qimg.ondragstart=e=>{
-e.dataTransfer.effectAllowed = 'all';
-
-console.dir(e.dataTransfer);
-}
-
-</script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            let f = document.createElement('iframe');
+            f.className = 'custom-iframe';
+            f.sandbox = 'allow-popups allow-scripts';
+            
+            f.srcdoc = `
+                <div style="font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100%; margin: 0;">
+                    <a target="_blank" href="https://ndev.tk/evil.html" 
+                       style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                        Click me
+                    </a>
+                </div>
+            `;
+            document.getElementById('iframe-container').appendChild(f);
+        });
+    </script>
+</body>
+</html>
